@@ -130,7 +130,7 @@ describe("joinroom", () => {
       )
 
       const [participantPDA] = anchor.web3.PublicKey.findProgramAddressSync(
-        [Buffer.from("participant"), roomPDA.toBuffer(), player.publicKey.toBuffer()],
+        [Buffer.from("participant"), roomPDA.toBuffer(), ninethPlayer.publicKey.toBuffer()],
         program.programId
       )
 
@@ -146,5 +146,42 @@ describe("joinroom", () => {
     } catch (err) {
       console.log("✅ 9th player blocked as expected:", err.message);
     }
+  })
+
+  it("Initializes the vault with a price pool", async () => {
+
+    const amount = anchor.web3.LAMPORTS_PER_SOL;
+
+    const [roomPDA] = anchor.web3.PublicKey.findProgramAddressSync(
+      [Buffer.from("room"), wallet.publicKey.toBuffer()],
+      program.programId
+    )
+    const [vaultPDA] = anchor.web3.PublicKey.findProgramAddressSync(
+      [Buffer.from("vault"), wallet.publicKey.toBuffer(), roomPDA.toBuffer()],
+      program.programId
+    )
+
+    await program.methods.initializeVault(new anchor.BN(amount)).accountsStrict(
+      {
+        room: roomPDA,
+        vault: vaultPDA,
+        creator: wallet.publicKey,
+        systemProgram: anchor.web3.SystemProgram.programId
+      }
+    ).rpc()
+
+    const vaultAccount = await program.account.vault.fetch(vaultPDA);
+    console.log("Vault Details:", {
+      balance: vaultAccount.balance.toString(),
+      isLocked: vaultAccount.isLocked,
+      authority: vaultAccount.vaultAuthority.toBase58(),
+      room: vaultAccount.room.toBase58(),
+    });
+
+    const roomAccount = await program.account.room.fetch(roomPDA);
+    console.log("Room Details:", {
+      name: roomAccount.name,
+      creator: roomAccount.creator.toBase58(),
+    });
   })
 });
