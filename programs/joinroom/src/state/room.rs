@@ -7,5 +7,6 @@ use anchor_lang::prelude::*;
 pub struct Room{
     #[max_len(50)]
     pub name : String,
-    pub creator : Pubkey
+    pub creator : Pubkey,
+    pub player_count : u8
 }
