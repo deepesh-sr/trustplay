@@ -37,8 +37,8 @@ describe("joinroom", () => {
     const newPlayer = anchor.web3.Keypair.generate();
     const signature = await anchor.AnchorProvider.env().connection.requestAirdrop(newPlayer.publicKey, anchor.web3.LAMPORTS_PER_SOL);
 
-    await anchor.AnchorProvider.env().connection.confirmTransaction(signature,"confirmed");
-    
+    await anchor.AnchorProvider.env().connection.confirmTransaction(signature, "confirmed");
+
 
     const [roomPDA] = anchor.web3.PublicKey.findProgramAddressSync(
       [Buffer.from("room"), wallet.publicKey.toBytes()],
@@ -60,7 +60,91 @@ describe("joinroom", () => {
       .signers([newPlayer])
       .rpc()
 
+    try {
+      const tx = await program.methods.joinroom()
+        .accountsStrict({
+          participantpda: participantPDA,
+          room: roomPDA,
+          participant: newPlayer.publicKey,
+          systemProgram: anchor.web3.SystemProgram.programId
+        })
+        .signers([newPlayer])
+        .rpc()
+      console.error("❌ Should not allow duplicate join!");
+    } catch (err) {
+      console.log("✅ Duplicate join prevented:", err.message);
+    }
     const ParticipantAccount = await program.account.participant.fetch(participantPDA);
     console.log("Player Details \n ", ParticipantAccount)
+  })
+
+  it("Prevents more than 8 Players from joining the same room", async () => {
+
+    //create a player array 
+    const players: anchor.web3.Keypair[] = [];
+
+    for (let i = 0; i < 8; i++) {
+
+
+      const playerKeyPair = anchor.web3.Keypair.generate();
+      const signature = await anchor.AnchorProvider.env().connection.requestAirdrop(playerKeyPair.publicKey, anchor.web3.LAMPORTS_PER_SOL);
+
+      await anchor.AnchorProvider.env().connection.confirmTransaction(signature, "confirmed");
+
+      players.push(playerKeyPair)
+
+    }
+
+    for (const player of players) {
+
+      const [roomPDA] = anchor.web3.PublicKey.findProgramAddressSync(
+        [Buffer.from("room"), wallet.publicKey.toBytes()],
+        program.programId,
+      )
+
+      const [participantPDA] = anchor.web3.PublicKey.findProgramAddressSync(
+        [Buffer.from("participant"), roomPDA.toBuffer(), player.publicKey.toBuffer()],
+        program.programId
+      )
+
+      await program.methods.joinroom().accountsStrict(
+        {
+          participantpda: participantPDA,
+          room: roomPDA,
+          participant: player.publicKey,
+          systemProgram: anchor.web3.SystemProgram.programId
+        }
+      ).signers([player]).rpc()
+
+      console.log(`✅ Player ${player.publicKey.toBase58()} joined.`);
+    }
+
+    try {
+      let ninethPlayer = anchor.web3.Keypair.generate();
+      let signature = await anchor.AnchorProvider.env().connection.requestAirdrop(ninethPlayer.publicKey, anchor.web3.LAMPORTS_PER_SOL);
+      await anchor.AnchorProvider.env().connection.confirmTransaction(signature, "confirmed");
+
+      const [roomPDA] = anchor.web3.PublicKey.findProgramAddressSync(
+        [Buffer.from("room"), wallet.publicKey.toBytes()],
+        program.programId,
+      )
+
+      const [participantPDA] = anchor.web3.PublicKey.findProgramAddressSync(
+        [Buffer.from("participant"), roomPDA.toBuffer(), player.publicKey.toBuffer()],
+        program.programId
+      )
+
+      await program.methods.joinroom().accountsStrict(
+        {
+          participantpda: participantPDA,
+          room: roomPDA,
+          participant: ninethPlayer.publicKey,
+          systemProgram: anchor.web3.SystemProgram.programId
+        }
+      ).signers([ninethPlayer]).rpc()
+      console.error("❌ Should not allow 9th player to join!");
+    } catch (err) {
+      console.log("✅ 9th player blocked as expected:", err.message);
+    }
   })
 });
